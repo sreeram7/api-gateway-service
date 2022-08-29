@@ -1,0 +1,43 @@
+server:
+  port: 8010
+  ssl:
+    enabled: true
+    key-alias: singteltest
+    key-store-password: changeIt
+    key-store: classpath:keystore/singteltest.p12
+    key-store-type: PKCS12
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8083/eureka
+
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      routes:
+        - id: service1Module
+          uri: lb://myservice1
+          predicates:
+          - Path=/api/**
+          - Method=GET,POST,PUT
+          - Header=Authorization, Bearer (.*)
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+            - AuthorizationHeaderFilter
+            - name: CircuitBreaker
+              args:
+                name: myCircuitBreaker
+                fallbackUri: forward:/fallback/message
+            - name: Retry
+              args:
+                retries: 2
+                statuses: BAD_GATEWAY
+                methods: GET,POST,PUT
+                backoff:
+                  firstBackoff: 10ms
+                  maxBackoff: 50ms
+                  factor: 2
+                  basedOnPreviousValue: false
